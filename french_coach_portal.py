@@ -2040,13 +2040,13 @@ def _render_step_7_hardcoded():
     st.subheader("Step 7 \u2014 Professional Development & Scenarios")
 
     with st.form("form_step7"):
-        improve_skills   = st.text_area("1. What steps do you take to continuously improve your teaching skills and stay updated with new methodologies?",
+        improve_skills   = st.text_area("1. What steps do you take to continuously improve your teaching skills?",
                                         value=st.session_state["improve_skills"], height=100)
-        excited_areas    = st.text_area("2. Are there any particular areas of French language teaching that you are currently working on or excited to develop further?",
+        excited_areas    = st.text_area("2. Are there areas you're currently working on or excited to improve? How can we support you in improving them?",
                                         value=st.session_state["excited_areas"], height=100)
-        grammar_error    = st.text_area("3. A student consistently makes the same grammatical error despite corrections. How would you address this issue while keeping the student motivated?",
+        grammar_error    = st.text_area("3. A student consistently makes the same grammatical error. How would you address it?",
                                         value=st.session_state["grammar_error"], height=100)
-        lesson_plan_levels = st.text_area("4. How would you structure a lesson plan for a complete beginner compared to an advanced student preparing for a certification exam?",
+        lesson_plan_levels = st.text_area("4. How would you structure a lesson plan for a complete beginner vs. an advanced student?",
                                           value=st.session_state["lesson_plan_levels"], height=120)
 
         submitted = st.form_submit_button("Continue \u2192", type="primary", use_container_width=True)
@@ -2090,9 +2090,9 @@ def render_step_8():
     st.subheader("Step 8 \u2014 Team, Communication & Rate")
 
     with st.form("form_step8"):
-        handle_criticism = st.text_area("1. How do you respond to constructive criticism from a supervisor?",
+        handle_criticism = st.text_area("1. How do you typically respond to constructive criticism or feedback from a supervisor or teammate?",
                                         value=st.session_state["handle_criticism"], height=100)
-        teamwork         = st.text_area("2. How comfortable are you working closely with a team?",
+        teamwork         = st.text_area("2. How comfortable are you working closely with a team and sharing responsibilities?",
                                         value=st.session_state["teamwork"], height=100)
 
         follow_process   = st.radio("3. Are you comfortable following a set process rather than always doing things your own way?",

@@ -113,28 +113,28 @@
       "questions": [
         {
           "key": "improve_skills",
-          "label": "1. What steps do you take to continuously improve your teaching skills and stay updated with new methodologies?",
+          "label": "1. What steps do you take to continuously improve your teaching skills?",
           "type": "textarea",
           "required": true,
           "height": 100
         },
         {
           "key": "excited_areas",
-          "label": "2. Are there any particular areas of French language teaching that you are currently working on or excited to develop further?",
+          "label": "2. Are there areas you're currently working on or excited to improve? How can we support you in improving them?",
           "type": "textarea",
           "required": true,
           "height": 100
         },
         {
           "key": "grammar_error",
-          "label": "3. A student consistently makes the same grammatical error despite corrections. How would you address this issue while keeping the student motivated?",
+          "label": "3. A student consistently makes the same grammatical error. How would you address it?",
           "type": "textarea",
           "required": true,
           "height": 100
         },
         {
           "key": "lesson_plan_levels",
-          "label": "4. How would you structure a lesson plan for a complete beginner compared to an advanced student preparing for a certification exam?",
+          "label": "4. How would you structure a lesson plan for a complete beginner vs. an advanced student?",
           "type": "textarea",
           "required": true,
           "height": 120

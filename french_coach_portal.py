@@ -1483,7 +1483,7 @@ def render_step_2():
     st.markdown("""
     <div class="section-card">
     <p>Please provide a <strong>short video introduction (2–5 minutes)</strong> where you introduce yourself
-    and describe your teaching approach — <strong>in both Spanish and English</strong>.</p>
+    and describe your teaching approach — <strong>in both French and English</strong>.</p>
     <p>You can upload videos, share a link, or record directly from your webcam.</p>
     <p><em>Make sure the video quality is good and there is no background noise, as we will use it to assess
     the quality of your online classes.</em></p>

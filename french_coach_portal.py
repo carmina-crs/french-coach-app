@@ -2214,7 +2214,7 @@ def render_step_9():
     """, unsafe_allow_html=True)
 
     st.markdown("""
-    <a href="https://docs.google.com/document/d/1EUNTrNC03Px6TfjNM4m3FZWylldbk_SU1Ci8Vm7qc9w/edit?usp=sharing"
+    <a href="https://docs.google.com/document/d/1m6rSmN8mkmGsuaHf5ZecIr9UdGm-oAwEn3UYy_EjgDM/edit?usp=sharing"
        target="_blank"
        style="display:block;text-align:center;background:#27ae60;color:white;padding:14px 24px;
               border-radius:8px;text-decoration:none;font-weight:700;font-size:1.05rem;margin:0.5rem 0 1.5rem;">

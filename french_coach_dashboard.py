@@ -1,0 +1,523 @@
+"""
+Talk in French – Coach Applications Dashboard
+==============================================
+Reads application records from Supabase (written by the French coach portal).
+
+Run locally:
+    streamlit run french_coach_dashboard.py
+"""
+
+import streamlit as st
+import pandas as pd
+import requests
+from datetime import datetime
+from io import BytesIO
+
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
+SUPABASE_URL = st.secrets.get("supabase_url", "")
+SUPABASE_KEY = st.secrets.get("supabase_key", "")
+
+st.set_page_config(
+    page_title="French Coach Applications Dashboard",
+    page_icon="🇫🇷",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# ---------------------------------------------------------------------------
+# Custom CSS
+# ---------------------------------------------------------------------------
+st.markdown("""
+<style>
+    .dashboard-header {
+        background: linear-gradient(135deg, #002395, #001a6e);
+        color: white; padding: 1.5rem 2rem; border-radius: 10px; margin-bottom: 1.5rem;
+    }
+    .dashboard-header h1 { color: white; margin: 0; font-size: 1.8rem; }
+    .dashboard-header p  { color: #d6e4ff; margin: 0.3rem 0 0 0; font-size: 1rem; }
+
+    .metric-card {
+        background: white; border: 1px solid #e0e0e0; border-radius: 10px;
+        padding: 1.2rem; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .metric-card .number { font-size: 2rem; font-weight: 700; color: #002395; }
+    .metric-card .label  { font-size: 0.85rem; color: #7f8c8d; margin-top: 0.2rem; }
+
+    .badge-recommended {
+        background: #27ae60; color: white; padding: 3px 10px;
+        border-radius: 12px; font-size: 0.8rem; font-weight: 600;
+    }
+    .badge-maybe {
+        background: #f39c12; color: white; padding: 3px 10px;
+        border-radius: 12px; font-size: 0.8rem; font-weight: 600;
+    }
+    .badge-not-recommended {
+        background: #e74c3c; color: white; padding: 3px 10px;
+        border-radius: 12px; font-size: 0.8rem; font-weight: 600;
+    }
+
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# Nice column labels (JSON key → display name)
+# ---------------------------------------------------------------------------
+COLUMN_LABELS = {
+    "submission_date": "Submission Date",
+    "name": "Name",
+    "email": "Email",
+    "age": "Age",
+    "country_origin": "Country of Origin",
+    "current_location": "Current Location",
+    "timezone": "Time Zone",
+    "mobile": "Mobile",
+    "whatsapp": "WhatsApp",
+    "address": "Address",
+    "tax_info": "Tax Information",
+    "payment_pref": "Payment Preference",
+    "teaching_schedule": "Teaching Schedule",
+    "profile_link": "Profile Link",
+    "native_french": "Native Speaker",
+    "french_type": "Type of French",
+    "years_teaching": "Years Teaching",
+    "certifications": "Certifications",
+    "students_taught": "Students Taught",
+    "all_levels": "Teach A1-C2",
+    "levels_detail": "Levels Detail",
+    "delf_exp": "DELF/DALF Experience",
+    "delf_detail": "DELF/DALF Detail",
+    "current_platforms": "Current Platforms",
+    "testimonial_link": "Testimonial Link",
+    "english_level": "English Level",
+    "ideal_rate": "Ideal Rate (USD)",
+    "ai_score": "Score",
+    "ai_verdict": "Verdict",
+    "ai_summary": "Summary",
+    "video_mode": "Video Mode",
+    "video_link": "Video Link",
+    "files_link": "Files Link",
+    "has_cv": "CV",
+    "has_certificates": "Certificates",
+    "has_video": "Video",
+    "status": "Status",
+    "notes": "Notes",
+    # Step 5 — Teaching Philosophy
+    "assess_proficiency": "How do you assess proficiency?",
+    "tailor_lessons": "How do you tailor lessons?",
+    "successful_lesson": "Successful lesson example",
+    "engaging_online": "Keeping online lessons engaging",
+    "student_duration": "Student retention",
+    "motivate_struggling": "Motivating struggling students",
+    "enjoy_process": "What do you enjoy about teaching?",
+    # Step 6 — Technology & Assessment
+    "multimedia": "Multimedia & cultural content",
+    "tech_setup": "Tech setup (mic, webcam, internet)",
+    "software": "Software / platforms used",
+    "assess_progress": "Assessing student progress",
+    "feedback_style": "Feedback style",
+    "adapt_teaching": "Adapting teaching approach",
+    "cultural_lesson": "Cultural lesson example",
+    # Step 7 — Professional Development
+    "improve_skills": "How do you improve your skills?",
+    "excited_areas": "Excited areas of teaching",
+    "grammar_error": "Grammar error approach",
+    "lesson_plan_levels": "Lesson plan for different levels",
+    # Step 8 — Team & Communication
+    "handle_criticism": "Handling criticism",
+    "teamwork": "Teamwork comfort",
+    "follow_process": "Comfortable following set process",
+    "first_session_win": "First session quick win",
+    "session_notes_ok": "Session notes & tracker updates",
+    "respond_24h": "Respond within 24h",
+    "hours_per_week": "Hours per week",
+    # Step 9 — Quiz
+    "quiz_1": "Quiz Q1",
+    "quiz_2": "Quiz Q2",
+    "quiz_3": "Quiz Q3",
+    "quiz_4": "Quiz Q4",
+    "quiz_5": "Quiz Q5",
+    "quiz_6": "Quiz Q6",
+    "quiz_7": "Quiz Q7",
+    "quiz_8": "Quiz Q8",
+    "quiz_9": "Quiz Q9",
+    "quiz_10": "Quiz Q10",
+    "quiz_11": "Quiz Q11",
+    "quiz_12": "Quiz Q12",
+}
+
+# ---------------------------------------------------------------------------
+# Data loading
+# ---------------------------------------------------------------------------
+
+def load_applications():
+    """Load application records from Supabase."""
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return pd.DataFrame()
+
+    try:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/french_applications?select=*&order=id.desc",
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+            },
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if not data:
+            return pd.DataFrame()
+        df = pd.DataFrame(data)
+        if "id" in df.columns:
+            df.rename(columns={"id": "ID"}, inplace=True)
+        df.rename(columns=COLUMN_LABELS, inplace=True)
+        return df
+    except Exception:
+        return pd.DataFrame()
+
+
+def update_application(record_id: int, status: str, notes: str) -> bool:
+    """Update status and notes for an application in Supabase."""
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        return False
+    try:
+        resp = requests.patch(
+            f"{SUPABASE_URL}/rest/v1/french_applications?id=eq.{record_id}",
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal",
+            },
+            json={"status": status, "notes": notes},
+        )
+        resp.raise_for_status()
+        return True
+    except Exception:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# Dashboard components
+# ---------------------------------------------------------------------------
+
+def render_metrics(df):
+    total = len(df)
+    recommended = maybe = not_rec = 0
+    if "Verdict" in df.columns:
+        verdicts = df["Verdict"].str.strip().str.upper()
+        recommended = (verdicts == "RECOMMENDED").sum()
+        maybe = (verdicts == "MAYBE").sum()
+        not_rec = (verdicts == "NOT RECOMMENDED").sum()
+
+    cols = st.columns(4)
+    with cols[0]:
+        st.markdown(f'<div class="metric-card"><div class="number">{total}</div>'
+                     f'<div class="label">Total Applications</div></div>',
+                     unsafe_allow_html=True)
+    with cols[1]:
+        st.markdown(f'<div class="metric-card"><div class="number" style="color:#27ae60">{recommended}</div>'
+                     f'<div class="label">Recommended</div></div>',
+                     unsafe_allow_html=True)
+    with cols[2]:
+        st.markdown(f'<div class="metric-card"><div class="number" style="color:#f39c12">{maybe}</div>'
+                     f'<div class="label">Maybe</div></div>',
+                     unsafe_allow_html=True)
+    with cols[3]:
+        st.markdown(f'<div class="metric-card"><div class="number" style="color:#e74c3c">{not_rec}</div>'
+                     f'<div class="label">Not Recommended</div></div>',
+                     unsafe_allow_html=True)
+
+
+def render_filters(df):
+    st.sidebar.markdown("## Filters")
+    filtered = df.copy()
+
+    # Search
+    search = st.sidebar.text_input("Search (name or email):", "")
+    if search:
+        mask = (
+            filtered.get("Name", pd.Series(dtype=str)).str.contains(search, case=False, na=False) |
+            filtered.get("Email", pd.Series(dtype=str)).str.contains(search, case=False, na=False)
+        )
+        filtered = filtered[mask]
+
+    # Status filter
+    if "Status" in filtered.columns:
+        status_values = sorted(filtered["Status"].fillna("").astype(str).unique())
+        status_values = [s if s.strip() else "Pending" for s in status_values]
+        status_values = sorted(set(status_values))
+        if status_values:
+            selected = st.sidebar.multiselect("Status:", status_values)
+            if selected:
+                normalized = filtered["Status"].fillna("").astype(str).replace("", "Pending")
+                filtered = filtered[normalized.isin(selected)]
+
+    # Country filter
+    if "Country of Origin" in filtered.columns:
+        countries = sorted(filtered["Country of Origin"].dropna().unique())
+        countries = [c for c in countries if c.strip()]
+        if countries:
+            selected = st.sidebar.multiselect("Country:", countries)
+            if selected:
+                filtered = filtered[filtered["Country of Origin"].isin(selected)]
+
+    # Type of French filter
+    if "Type of French" in filtered.columns:
+        types = sorted(filtered["Type of French"].dropna().unique())
+        types = [t for t in types if t.strip()]
+        if types:
+            selected = st.sidebar.multiselect("Type of French:", types)
+            if selected:
+                filtered = filtered[filtered["Type of French"].isin(selected)]
+
+    # Score range
+    if "Score" in filtered.columns:
+        scores = pd.to_numeric(filtered["Score"], errors="coerce")
+        if scores.notna().any():
+            mn, mx = int(scores.min()), int(scores.max())
+            if mn < mx:
+                rng = st.sidebar.slider("Score range:", mn, mx, (mn, mx))
+                filtered = filtered[scores.between(rng[0], rng[1]) | scores.isna()]
+
+    st.sidebar.markdown("---")
+    st.sidebar.markdown(f"**Showing {len(filtered)} of {len(df)} applications**")
+    return filtered
+
+
+def render_table(df):
+    st.markdown("### Applications")
+
+    if df.empty:
+        st.info("No applications match the current filters.")
+        return
+
+    summary_cols = [
+        "Submission Date", "Name", "Email", "Country of Origin",
+        "Type of French", "Years Teaching", "Ideal Rate (USD)", "Score", "Verdict",
+        "Status", "CV", "Certificates", "Video",
+    ]
+    available = [c for c in summary_cols if c in df.columns]
+
+    st.dataframe(
+        df[available],
+        use_container_width=True,
+        hide_index=True,
+        height=min(400, 50 + 35 * len(df)),
+    )
+
+    csv = df.to_csv(index=False)
+    st.download_button(
+        "Download as CSV",
+        csv,
+        f"french_coach_applications_{datetime.now().strftime('%Y%m%d')}.csv",
+        "text/csv",
+    )
+
+
+def render_detail_view(df):
+    st.markdown("### Applicant Details")
+
+    if df.empty:
+        return
+
+    names = df.get("Name", pd.Series(dtype=str)).tolist()
+    emails = df.get("Email", pd.Series(dtype=str)).tolist()
+    options = [f"{n} ({e})" for n, e in zip(names, emails)]
+
+    selected = st.selectbox("Select an applicant to view details:", options)
+    if selected is None:
+        return
+
+    idx = options.index(selected)
+    row = df.iloc[idx]
+
+    # Status & Notes editor
+    record_id = row.get("ID")
+    if record_id is not None:
+        st.markdown("#### Review & Decision")
+        status_options = ["Pending", "Shortlisted", "Hired", "Rejected"]
+        current_status = str(row.get("Status", "Pending") or "Pending")
+        if current_status not in status_options:
+            current_status = "Pending"
+        current_notes = str(row.get("Notes", "") or "")
+
+        col_s, col_btn = st.columns([2, 1])
+        with col_s:
+            new_status = st.selectbox(
+                "Status:", status_options,
+                index=status_options.index(current_status),
+                key=f"status_{record_id}",
+            )
+        new_notes = st.text_area(
+            "Internal notes:", value=current_notes,
+            height=100, key=f"notes_{record_id}",
+        )
+        with col_btn:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("Save changes", key=f"save_{record_id}", type="primary",
+                         use_container_width=True):
+                if update_application(int(record_id), new_status, new_notes):
+                    st.success("Saved.")
+                    st.rerun()
+                else:
+                    st.error("Failed to save.")
+        st.markdown("---")
+
+    sections = {
+        "Personal Information": [
+            "Name", "Email", "Age", "Country of Origin", "Current Location",
+            "Time Zone", "Mobile", "WhatsApp", "Address",
+        ],
+        "Employment Details": [
+            "Tax Information", "Payment Preference", "Teaching Schedule",
+            "Profile Link", "English Level", "Ideal Rate (USD)",
+            "Hours per week",
+        ],
+        "Teaching Background": [
+            "Native Speaker", "Type of French", "Years Teaching",
+            "Certifications", "Students Taught", "Teach A1-C2", "Levels Detail",
+            "DELF/DALF Experience", "DELF/DALF Detail", "Current Platforms",
+            "Testimonial Link",
+        ],
+        "Teaching Philosophy (Step 5)": [
+            "How do you assess proficiency?", "How do you tailor lessons?",
+            "Successful lesson example", "Keeping online lessons engaging",
+            "Student retention", "Motivating struggling students",
+            "What do you enjoy about teaching?",
+        ],
+        "Technology & Assessment (Step 6)": [
+            "Multimedia & cultural content", "Tech setup (mic, webcam, internet)",
+            "Software / platforms used", "Assessing student progress",
+            "Feedback style", "Adapting teaching approach",
+            "Cultural lesson example",
+        ],
+        "Professional Development (Step 7)": [
+            "How do you improve your skills?", "Excited areas of teaching",
+            "Grammar error approach", "Lesson plan for different levels",
+        ],
+        "Team & Communication (Step 8)": [
+            "Handling criticism", "Teamwork comfort",
+            "Comfortable following set process", "First session quick win",
+            "Session notes & tracker updates", "Respond within 24h",
+        ],
+        "Program Understanding Quiz (Step 9)": [
+            "Quiz Q1", "Quiz Q2", "Quiz Q3", "Quiz Q4",
+            "Quiz Q5", "Quiz Q6", "Quiz Q7", "Quiz Q8",
+            "Quiz Q9", "Quiz Q10", "Quiz Q11", "Quiz Q12",
+        ],
+        "AI Assessment": [
+            "Score", "Verdict", "Summary",
+        ],
+        "Media & Files": [
+            "Video Mode", "Video Link", "Files Link",
+        ],
+    }
+
+    link_fields = {"Video Link", "Files Link", "Profile Link", "Testimonial Link"}
+
+    for section_name, fields in sections.items():
+        available = [f for f in fields if f in row.index and str(row[f]).strip()]
+        if not available:
+            continue
+
+        with st.expander(section_name, expanded=(section_name == "Personal Information")):
+            for field in available:
+                value = str(row[field])
+                if field == "Verdict":
+                    v = value.strip().upper()
+                    badge = ("badge-recommended" if v == "RECOMMENDED"
+                             else "badge-maybe" if v == "MAYBE"
+                             else "badge-not-recommended")
+                    st.markdown(f"**{field}:** <span class='{badge}'>{value}</span>",
+                                unsafe_allow_html=True)
+                elif field in link_fields and value.startswith("http"):
+                    st.markdown(f"**{field}:** [{value}]({value})")
+                elif field == "Summary":
+                    st.markdown(f"**{field}:**")
+                    st.text_area("", value, height=150, disabled=True,
+                                 key=f"summary_{idx}_{field}")
+                else:
+                    st.markdown(f"**{field}:** {value}")
+
+
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
+
+def main():
+    st.markdown("""
+    <div class="dashboard-header">
+        <h1>🇫🇷 French Coach Applications Dashboard</h1>
+        <p>Talk in French — View and manage French coach applications</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    df = load_applications()
+
+    if df.empty:
+        st.info("No applications recorded yet. Applications will appear here "
+                "after coaches submit through the portal.")
+        return
+
+    col1, col2 = st.columns([6, 1])
+    with col2:
+        if st.button("Refresh", use_container_width=True):
+            st.rerun()
+
+    render_metrics(df)
+    st.markdown("")
+
+    filtered_df = render_filters(df)
+
+    st.markdown(
+        """
+        <style>
+        div[data-baseweb="tab-list"] {
+            gap: 12px;
+        }
+        div[data-baseweb="tab-list"] button[data-baseweb="tab"] {
+            height: 60px;
+            padding: 0 28px;
+            font-size: 20px;
+            font-weight: 700;
+            border-radius: 10px 10px 0 0;
+            color: white !important;
+        }
+        div[data-baseweb="tab-list"] button[data-baseweb="tab"]:nth-child(1) {
+            background-color: #002395;
+        }
+        div[data-baseweb="tab-list"] button[data-baseweb="tab"]:nth-child(1):hover {
+            background-color: #001a6e;
+        }
+        div[data-baseweb="tab-list"] button[data-baseweb="tab"]:nth-child(2) {
+            background-color: #27ae60;
+        }
+        div[data-baseweb="tab-list"] button[data-baseweb="tab"]:nth-child(2):hover {
+            background-color: #1e8449;
+        }
+        div[data-baseweb="tab-list"] button[data-baseweb="tab"][aria-selected="true"] {
+            box-shadow: 0 -4px 0 #ED2939 inset;
+        }
+        div[data-baseweb="tab-list"] button[data-baseweb="tab"] p {
+            font-size: 20px !important;
+            font-weight: 700 !important;
+            color: white !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    tab1, tab2 = st.tabs(["Table View", "Detail View"])
+    with tab1:
+        render_table(filtered_df)
+    with tab2:
+        render_detail_view(filtered_df)
+
+
+if __name__ == "__main__":
+    main()

@@ -1219,7 +1219,7 @@ def save_application_record(state: dict, analysis: dict, drive_link: str = ""):
         }
 
         resp = _req.post(
-            f"{SUPABASE_URL}/rest/v1/applications",
+            f"{SUPABASE_URL}/rest/v1/french_applications",
             headers={
                 "apikey": SUPABASE_KEY,
                 "Authorization": f"Bearer {SUPABASE_KEY}",
